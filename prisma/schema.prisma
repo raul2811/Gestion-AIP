@@ -1,0 +1,744 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model activos {
+  id_activo                String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_activo            String                  @db.VarChar(255)
+  id_tipo_activo           String                  @db.Uuid
+  descripcion              String?
+  fecha_adquisicion        DateTime?               @db.Date
+  valor_adquisicion        Decimal?                @db.Decimal(18, 2)
+  estado_activo            String?                 @db.VarChar(50)
+  ubicacion_fisica         String?
+  id_departamento_asignado String?                 @db.Uuid
+  departamentos            departamentos?          @relation(fields: [id_departamento_asignado], references: [id_departamento], onDelete: NoAction, onUpdate: NoAction)
+  tipos_activo             tipos_activo            @relation(fields: [id_tipo_activo], references: [id_tipo_activo], onDelete: NoAction, onUpdate: NoAction)
+  mantenimientos_activo    mantenimientos_activo[]
+
+  @@index([id_departamento_asignado], map: "idx_activos_id_depto")
+  @@index([id_tipo_activo], map: "idx_activos_id_tipo")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model acuerdo_proyecto {
+  id_acuerdo        String            @db.Uuid
+  id_proyecto       String            @db.Uuid
+  acuerdos_servicio acuerdos_servicio @relation(fields: [id_acuerdo], references: [id_acuerdo], onDelete: Cascade, onUpdate: NoAction)
+  proyectos         proyectos         @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_acuerdo, id_proyecto])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model acuerdos_servicio {
+  id_acuerdo          String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_acuerdo      String             @db.VarChar(255)
+  tipo_servicio       String?            @db.VarChar(100)
+  fecha_inicio        DateTime?          @db.Date
+  fecha_fin           DateTime?          @db.Date
+  estado              String?            @db.VarChar(50)
+  monto_acordado      Decimal?           @db.Decimal(18, 2)
+  id_aip_colaboradora String             @db.Uuid
+  acuerdo_proyecto    acuerdo_proyecto[]
+  aips_colaboradoras  aips_colaboradoras @relation(fields: [id_aip_colaboradora], references: [id_aip_colaboradora], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model aips_colaboradoras {
+  id_aip_colaboradora String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_aip          String              @unique @db.VarChar(255)
+  ruc                 String?             @unique @db.VarChar(50)
+  direccion           String?
+  telefono            String?             @db.VarChar(50)
+  correo_contacto     String?             @db.VarChar(255)
+  persona_contacto    String?             @db.VarChar(255)
+  fecha_registro      DateTime?           @default(now()) @db.Timestamptz(6)
+  acuerdos_servicio   acuerdos_servicio[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model archivos {
+  id_archivo              String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_original_archivo String                 @db.VarChar(255)
+  tipo_mime               String?                @db.VarChar(100)
+  url_almacenamiento      String
+  tamano_bytes            BigInt?
+  hash_contenido          Bytes?
+  fecha_subida            DateTime?              @default(now()) @db.Timestamptz(6)
+  id_usuario_subio        String                 @db.Uuid
+  usuarios                usuarios               @relation(fields: [id_usuario_subio], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+  documento_firmas        documento_firmas[]
+  documento_versiones     documento_versiones[]
+  proyecto_archivos       proyecto_archivos[]
+  tarea_archivos          tarea_archivos[]
+  transaccion_archivos    transaccion_archivos[]
+
+  @@index([id_usuario_subio], map: "idx_archivos_id_usuario")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model asientos_contables {
+  id_asiento                String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_transaccion            String                    @db.Uuid
+  id_cuenta_contable        String                    @db.Uuid
+  debito                    Decimal                   @default(0) @db.Decimal(18, 2)
+  credito                   Decimal                   @default(0) @db.Decimal(18, 2)
+  fecha_asiento             DateTime?                 @default(now()) @db.Date
+  cuentas_contables         cuentas_contables         @relation(fields: [id_cuenta_contable], references: [id_cuenta_contable], onDelete: NoAction, onUpdate: NoAction)
+  transacciones_financieras transacciones_financieras @relation(fields: [id_transaccion], references: [id_transaccion], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_cuenta_contable], map: "idx_asiento_id_cuenta")
+  @@index([id_transaccion], map: "idx_asiento_id_trans")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model auditoria_cambios {
+  id_cambio            String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_evento_auditoria  String            @db.Uuid
+  tabla_afectada       String            @db.VarChar(100)
+  id_registro_afectado String
+  campo_modificado     String            @db.VarChar(100)
+  valor_anterior       Json?
+  valor_nuevo          Json?
+  auditoria_eventos    auditoria_eventos @relation(fields: [id_evento_auditoria], references: [id_evento], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_evento_auditoria], map: "idx_audcam_id_evento")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model auditoria_eventos {
+  id_evento         String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_usuario        String?             @db.Uuid
+  tipo_evento       String              @db.VarChar(255)
+  descripcion       String?
+  fecha_evento      DateTime?           @default(now()) @db.Timestamptz(6)
+  auditoria_cambios auditoria_cambios[]
+  usuarios          usuarios?           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_usuario], map: "idx_audev_id_usuario")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model beneficiarios {
+  id_beneficiario              String                         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_completo              String                         @db.VarChar(255)
+  cedula                       String?                        @unique @db.VarChar(50)
+  telefono                     String?                        @db.VarChar(50)
+  correo                       String?                        @db.VarChar(255)
+  direccion                    String?
+  fecha_nacimiento             DateTime?                      @db.Date
+  genero                       String?                        @db.VarChar(50)
+  fecha_registro               DateTime?                      @default(now()) @db.Timestamptz(6)
+  id_usuario_registra          String                         @db.Uuid
+  usuarios                     usuarios                       @relation(fields: [id_usuario_registra], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+  lista_distribucion_contactos lista_distribucion_contactos[]
+  proyecto_beneficiario        proyecto_beneficiario[]
+
+  @@index([id_usuario_registra], map: "idx_benef_id_usuario")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model campanas {
+  id_campana             String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_campana         String                @db.VarChar(255)
+  objetivo               String?
+  fecha_inicio           DateTime              @db.Date
+  fecha_fin              DateTime?             @db.Date
+  presupuesto            Decimal?              @db.Decimal(18, 2)
+  id_tipo_campana        String                @db.Uuid
+  id_usuario_responsable String                @db.Uuid
+  tipos_campana          tipos_campana         @relation(fields: [id_tipo_campana], references: [id_tipo_campana], onDelete: NoAction, onUpdate: NoAction)
+  usuarios               usuarios              @relation(fields: [id_usuario_responsable], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  envios_comunicacion    envios_comunicacion[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model corregimientos {
+  id_corregimiento     String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_corregimiento String                 @db.VarChar(100)
+  id_distrito          String                 @db.Uuid
+  distritos            distritos              @relation(fields: [id_distrito], references: [id_distrito], onDelete: NoAction, onUpdate: NoAction)
+  proyecto_ubicaciones proyecto_ubicaciones[]
+  proyectos            proyectos[]
+
+  @@unique([nombre_corregimiento, id_distrito], map: "uq_corregimiento_distrito")
+  @@index([id_distrito], map: "idx_corregimientos_id_distrito")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model cuentas_contables {
+  id_cuenta_contable    String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  codigo_cuenta         String                @unique @db.VarChar(50)
+  nombre_cuenta         String                @db.VarChar(255)
+  descripcion           String?
+  id_tipo_cuenta        String                @db.Uuid
+  permite_transacciones Boolean               @default(true)
+  asientos_contables    asientos_contables[]
+  tipos_cuenta_contable tipos_cuenta_contable @relation(fields: [id_tipo_cuenta], references: [id_tipo_cuenta], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model departamentos {
+  id_departamento             String                        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_departamento         String                        @unique @db.VarChar(100)
+  descripcion                 String?
+  fecha_creacion              DateTime?                     @default(now()) @db.Timestamptz(6)
+  activos                     activos[]
+  presupuestos                presupuestos[]
+  usuario_departamento_puesto usuario_departamento_puesto[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model distritos {
+  id_distrito     String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_distrito String           @db.VarChar(100)
+  id_provincia    String           @db.Uuid
+  corregimientos  corregimientos[]
+  provincias      provincias       @relation(fields: [id_provincia], references: [id_provincia], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([nombre_distrito, id_provincia], map: "uq_distrito_provincia")
+  @@index([id_provincia], map: "idx_distritos_id_provincia")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model documento_firmas {
+  id_firma                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_archivo              String    @db.Uuid
+  id_usuario_firmante     String    @db.Uuid
+  fecha_firma             DateTime? @default(now()) @db.Timestamptz(6)
+  tipo_firma              String    @db.VarChar(100)
+  proveedor_certificacion String?   @db.VarChar(255)
+  hash_firma              String
+  archivos                archivos  @relation(fields: [id_archivo], references: [id_archivo], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                usuarios  @relation(fields: [id_usuario_firmante], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model documento_versiones {
+  id_version          String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_documento        String     @db.Uuid
+  id_archivo          String     @db.Uuid
+  numero_version      String     @db.VarChar(50)
+  descripcion_cambios String?
+  fecha_version       DateTime?  @default(now()) @db.Timestamptz(6)
+  id_usuario_version  String     @db.Uuid
+  archivos            archivos   @relation(fields: [id_archivo], references: [id_archivo], onDelete: NoAction, onUpdate: NoAction)
+  documentos          documentos @relation(fields: [id_documento], references: [id_documento], onDelete: Cascade, onUpdate: NoAction)
+  usuarios            usuarios   @relation(fields: [id_usuario_version], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([id_documento, numero_version], map: "uq_doc_version")
+  @@index([id_archivo], map: "idx_docver_id_archivo")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model documentos {
+  id_documento        String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  titulo              String                @db.VarChar(255)
+  id_tipo_documento   String                @db.Uuid
+  estado              String                @default("Activo") @db.VarChar(50)
+  id_usuario_creador  String                @db.Uuid
+  fecha_creacion      DateTime?             @default(now()) @db.Timestamptz(6)
+  documento_versiones documento_versiones[]
+  tipos_documento     tipos_documento       @relation(fields: [id_tipo_documento], references: [id_tipo_documento], onDelete: NoAction, onUpdate: NoAction)
+  usuarios            usuarios              @relation(fields: [id_usuario_creador], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_tipo_documento], map: "idx_doc_id_tipodoc")
+  @@index([id_usuario_creador], map: "idx_doc_id_usuario")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model envios_comunicacion {
+  id_envio              String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_campana            String               @db.Uuid
+  id_lista_distribucion String?              @db.Uuid
+  asunto                String?              @db.VarChar(255)
+  cuerpo_mensaje        String?
+  canal_envio           String               @db.VarChar(50)
+  fecha_envio           DateTime?            @default(now()) @db.Timestamptz(6)
+  campanas              campanas             @relation(fields: [id_campana], references: [id_campana], onDelete: NoAction, onUpdate: NoAction)
+  listas_distribucion   listas_distribucion? @relation(fields: [id_lista_distribucion], references: [id_lista], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model estados_proyecto {
+  id_estado_proyecto String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_estado      String      @unique @db.VarChar(100)
+  proyectos          proyectos[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model estados_tarea {
+  id_estado_tarea String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_estado   String   @unique @db.VarChar(100)
+  tareas          tareas[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fases_proyecto {
+  id_fase     String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_fase String   @unique @db.VarChar(100)
+  descripcion String?
+  tareas      tareas[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model hitos_proyecto {
+  id_hito               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_hito           String    @db.VarChar(255)
+  descripcion           String?
+  fecha_prevista        DateTime? @db.Date
+  fecha_real_completado DateTime? @db.Date
+  estado                String    @db.VarChar(50)
+  id_proyecto           String    @db.Uuid
+  proyectos             proyectos @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_proyecto], map: "idx_hitos_id_proyecto")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model lista_distribucion_contactos {
+  id_lista            String              @db.Uuid
+  id_tercero          String              @db.Uuid
+  id_beneficiario     String              @db.Uuid
+  beneficiarios       beneficiarios       @relation(fields: [id_beneficiario], references: [id_beneficiario], onDelete: Cascade, onUpdate: NoAction)
+  listas_distribucion listas_distribucion @relation(fields: [id_lista], references: [id_lista], onDelete: Cascade, onUpdate: NoAction)
+  terceros            terceros            @relation(fields: [id_tercero], references: [id_tercero], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_lista, id_tercero, id_beneficiario])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model listas_distribucion {
+  id_lista                     String                         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_lista                 String                         @unique @db.VarChar(255)
+  descripcion                  String?
+  envios_comunicacion          envios_comunicacion[]
+  lista_distribucion_contactos lista_distribucion_contactos[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mantenimientos_activo {
+  id_mantenimiento     String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_activo            String    @db.Uuid
+  fecha_mantenimiento  DateTime? @default(now()) @db.Date
+  descripcion          String?
+  costo                Decimal?  @db.Decimal(18, 2)
+  id_tercero_proveedor String?   @db.Uuid
+  activos              activos   @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
+  terceros             terceros? @relation(fields: [id_tercero_proveedor], references: [id_tercero], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_activo], map: "idx_mant_id_activo")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notificaciones {
+  id_notificacion    String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_usuario_destino String    @db.Uuid
+  mensaje            String
+  leido              Boolean   @default(false)
+  fecha_creacion     DateTime? @default(now()) @db.Timestamptz(6)
+  url_relacionada    String?
+  usuarios           usuarios  @relation(fields: [id_usuario_destino], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_usuario_destino], map: "idx_notif_id_usuario")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model paises {
+  id_pais     String       @id @db.Char(2)
+  nombre_pais String       @unique @db.VarChar(100)
+  provincias  provincias[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model parametros_sistema {
+  clave          String  @id @db.VarChar(100)
+  valor          String
+  descripcion    String?
+  es_editable_ui Boolean @default(true)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model partidas_presupuestarias {
+  id_partida          String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_presupuesto      String                @db.Uuid
+  nombre_partida      String                @db.VarChar(255)
+  monto_asignado      Decimal               @db.Decimal(18, 2)
+  presupuestos        presupuestos          @relation(fields: [id_presupuesto], references: [id_presupuesto], onDelete: Cascade, onUpdate: NoAction)
+  transaccion_partida transaccion_partida[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model permisos {
+  id_permiso   String         @id @db.VarChar(100)
+  descripcion  String
+  modulo       String         @db.VarChar(100)
+  rol_permisos rol_permisos[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model presupuestos {
+  id_presupuesto           String                     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_presupuesto       String                     @db.VarChar(255)
+  monto_total_asignado     Decimal                    @db.Decimal(18, 2)
+  fecha_inicio             DateTime                   @db.Date
+  fecha_fin                DateTime                   @db.Date
+  id_proyecto              String?                    @db.Uuid
+  id_departamento          String?                    @db.Uuid
+  partidas_presupuestarias partidas_presupuestarias[]
+  departamentos            departamentos?             @relation(fields: [id_departamento], references: [id_departamento], onDelete: NoAction, onUpdate: NoAction)
+  proyectos                proyectos?                 @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_departamento], map: "idx_presup_id_depto")
+  @@index([id_proyecto], map: "idx_presup_id_proyecto")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model prioridades_tarea {
+  id_prioridad_tarea String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_prioridad   String   @unique @db.VarChar(100)
+  nivel              Int      @unique
+  tareas             tareas[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model provincias {
+  id_provincia     String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_provincia String      @db.VarChar(100)
+  id_pais          String      @db.Char(2)
+  distritos        distritos[]
+  paises           paises      @relation(fields: [id_pais], references: [id_pais], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([nombre_provincia, id_pais], map: "uq_provincia_pais")
+  @@index([id_pais], map: "idx_provincias_id_pais")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model proyecto_archivos {
+  id_proyecto         String    @db.Uuid
+  id_archivo          String    @db.Uuid
+  descripcion_archivo String?
+  archivos            archivos  @relation(fields: [id_archivo], references: [id_archivo], onDelete: Cascade, onUpdate: NoAction)
+  proyectos           proyectos @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_proyecto, id_archivo])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model proyecto_beneficiario {
+  id_proyecto       String        @db.Uuid
+  id_beneficiario   String        @db.Uuid
+  fecha_vinculacion DateTime?     @default(now()) @db.Timestamptz(6)
+  estado            String        @default("Activo") @db.VarChar(50)
+  beneficiarios     beneficiarios @relation(fields: [id_beneficiario], references: [id_beneficiario], onDelete: Cascade, onUpdate: NoAction)
+  proyectos         proyectos     @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_proyecto, id_beneficiario])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model proyecto_equipo {
+  id_proyecto     String    @db.Uuid
+  id_usuario      String    @db.Uuid
+  rol_en_proyecto String?   @db.VarChar(100)
+  proyectos       proyectos @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+  usuarios        usuarios  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_proyecto, id_usuario])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model proyecto_ubicaciones {
+  id_proyecto      String         @db.Uuid
+  id_corregimiento String         @db.Uuid
+  corregimientos   corregimientos @relation(fields: [id_corregimiento], references: [id_corregimiento], onDelete: Cascade, onUpdate: NoAction)
+  proyectos        proyectos      @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_proyecto, id_corregimiento])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model proyectos {
+  id_proyecto                String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_proyecto            String                      @db.VarChar(255)
+  descripcion                String?
+  fecha_inicio_plan          DateTime?                   @db.Date
+  fecha_fin_plan             DateTime?                   @db.Date
+  fecha_inicio_real          DateTime?                   @db.Date
+  fecha_fin_real             DateTime?                   @db.Date
+  id_estado_proyecto         String                      @db.Uuid
+  id_usuario_creador         String                      @db.Uuid
+  id_corregimiento_principal String?                     @db.Uuid
+  acuerdo_proyecto           acuerdo_proyecto[]
+  hitos_proyecto             hitos_proyecto[]
+  presupuestos               presupuestos[]
+  proyecto_archivos          proyecto_archivos[]
+  proyecto_beneficiario      proyecto_beneficiario[]
+  proyecto_equipo            proyecto_equipo[]
+  proyecto_ubicaciones       proyecto_ubicaciones[]
+  corregimientos             corregimientos?             @relation(fields: [id_corregimiento_principal], references: [id_corregimiento], onDelete: NoAction, onUpdate: NoAction)
+  estados_proyecto           estados_proyecto            @relation(fields: [id_estado_proyecto], references: [id_estado_proyecto], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                   usuarios                    @relation(fields: [id_usuario_creador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  tareas                     tareas[]
+  transacciones_financieras  transacciones_financieras[]
+
+  @@index([id_usuario_creador], map: "idx_proyectos_id_creador")
+  @@index([id_estado_proyecto], map: "idx_proyectos_id_estado")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model puestos {
+  id_puesto                   String                        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_puesto               String                        @unique @db.VarChar(100)
+  descripcion                 String?
+  usuario_departamento_puesto usuario_departamento_puesto[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model rol_permisos {
+  id_rol     String   @db.Uuid
+  id_permiso String   @db.VarChar(100)
+  permisos   permisos @relation(fields: [id_permiso], references: [id_permiso], onDelete: Cascade, onUpdate: NoAction)
+  roles      roles    @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_rol, id_permiso])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model roles {
+  id_rol        String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_rol    String          @unique @db.VarChar(100)
+  descripcion   String?
+  rol_permisos  rol_permisos[]
+  usuario_roles usuario_roles[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sesiones_usuario {
+  id_sesion    String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_usuario   String    @db.Uuid
+  fecha_inicio DateTime? @default(now()) @db.Timestamptz(6)
+  fecha_fin    DateTime? @db.Timestamptz(6)
+  direccion_ip String?   @db.Inet
+  user_agent   String?
+  exito_login  Boolean
+  usuarios     usuarios  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tarea_archivos {
+  id_tarea            String   @db.Uuid
+  id_archivo          String   @db.Uuid
+  descripcion_archivo String?
+  archivos            archivos @relation(fields: [id_archivo], references: [id_archivo], onDelete: Cascade, onUpdate: NoAction)
+  tareas              tareas   @relation(fields: [id_tarea], references: [id_tarea], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_tarea, id_archivo])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tarea_asignados {
+  id_tarea   String   @db.Uuid
+  id_usuario String   @db.Uuid
+  tareas     tareas   @relation(fields: [id_tarea], references: [id_tarea], onDelete: Cascade, onUpdate: NoAction)
+  usuarios   usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_tarea, id_usuario])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tareas {
+  id_tarea           String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tarea       String            @db.VarChar(255)
+  descripcion        String?
+  fecha_creacion     DateTime?         @default(now()) @db.Timestamptz(6)
+  fecha_vencimiento  DateTime?         @db.Date
+  id_proyecto        String            @db.Uuid
+  id_fase            String?           @db.Uuid
+  id_estado_tarea    String            @db.Uuid
+  id_prioridad_tarea String            @db.Uuid
+  id_tarea_padre     String?           @db.Uuid
+  tarea_archivos     tarea_archivos[]
+  tarea_asignados    tarea_asignados[]
+  estados_tarea      estados_tarea     @relation(fields: [id_estado_tarea], references: [id_estado_tarea], onDelete: NoAction, onUpdate: NoAction)
+  fases_proyecto     fases_proyecto?   @relation(fields: [id_fase], references: [id_fase], onDelete: NoAction, onUpdate: NoAction)
+  prioridades_tarea  prioridades_tarea @relation(fields: [id_prioridad_tarea], references: [id_prioridad_tarea], onDelete: NoAction, onUpdate: NoAction)
+  proyectos          proyectos         @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: Cascade, onUpdate: NoAction)
+  tareas             tareas?           @relation("tareasTotareas", fields: [id_tarea_padre], references: [id_tarea], onDelete: NoAction, onUpdate: NoAction)
+  other_tareas       tareas[]          @relation("tareasTotareas")
+
+  @@index([id_estado_tarea], map: "idx_tareas_id_estado")
+  @@index([id_proyecto], map: "idx_tareas_id_proyecto")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model terceros {
+  id_tercero                   String                         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tercero               String                         @db.VarChar(255)
+  identificador_fiscal         String?                        @unique @db.VarChar(50)
+  tipo_tercero                 String                         @db.VarChar(50)
+  es_persona_natural           Boolean
+  contacto_principal           String?                        @db.VarChar(255)
+  telefono                     String?                        @db.VarChar(50)
+  correo                       String?                        @db.VarChar(255)
+  lista_distribucion_contactos lista_distribucion_contactos[]
+  mantenimientos_activo        mantenimientos_activo[]
+  transacciones_financieras    transacciones_financieras[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_activo {
+  id_tipo_activo String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tipo    String    @unique @db.VarChar(100)
+  activos        activos[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_campana {
+  id_tipo_campana String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tipo     String     @unique @db.VarChar(100)
+  campanas        campanas[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_cuenta_contable {
+  id_tipo_cuenta     String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tipo_cuenta String              @unique @db.VarChar(100)
+  cuentas_contables  cuentas_contables[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_documento {
+  id_tipo_documento String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tipo       String       @unique @db.VarChar(100)
+  documentos        documentos[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_transaccion_financiera {
+  id_tipo_transaccion       String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_tipo               String                      @unique @db.VarChar(100)
+  naturaleza                String                      @db.VarChar(50)
+  transacciones_financieras transacciones_financieras[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model transaccion_archivos {
+  id_transaccion            String                    @db.Uuid
+  id_archivo                String                    @db.Uuid
+  descripcion_archivo       String?
+  archivos                  archivos                  @relation(fields: [id_archivo], references: [id_archivo], onDelete: Cascade, onUpdate: NoAction)
+  transacciones_financieras transacciones_financieras @relation(fields: [id_transaccion], references: [id_transaccion], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_transaccion, id_archivo])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model transaccion_partida {
+  id_transaccion            String                    @db.Uuid
+  id_partida                String                    @db.Uuid
+  monto_afectado            Decimal                   @db.Decimal(18, 2)
+  partidas_presupuestarias  partidas_presupuestarias  @relation(fields: [id_partida], references: [id_partida], onDelete: NoAction, onUpdate: NoAction)
+  transacciones_financieras transacciones_financieras @relation(fields: [id_transaccion], references: [id_transaccion], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([id_transaccion, id_partida])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model transacciones_financieras {
+  id_transaccion               String                       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  monto                        Decimal                      @db.Decimal(18, 2)
+  fecha_transaccion            DateTime?                    @default(now()) @db.Date
+  descripcion                  String
+  id_tipo_transaccion          String                       @db.Uuid
+  id_proyecto                  String?                      @db.Uuid
+  id_tercero                   String?                      @db.Uuid
+  id_usuario_registro          String                       @db.Uuid
+  estado                       String                       @default("Completada") @db.VarChar(50)
+  asientos_contables           asientos_contables[]
+  transaccion_archivos         transaccion_archivos[]
+  transaccion_partida          transaccion_partida[]
+  proyectos                    proyectos?                   @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: NoAction, onUpdate: NoAction)
+  terceros                     terceros?                    @relation(fields: [id_tercero], references: [id_tercero], onDelete: NoAction, onUpdate: NoAction)
+  tipos_transaccion_financiera tipos_transaccion_financiera @relation(fields: [id_tipo_transaccion], references: [id_tipo_transaccion], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                     usuarios                     @relation(fields: [id_usuario_registro], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([fecha_transaccion], map: "idx_trans_fecha")
+  @@index([id_proyecto], map: "idx_trans_id_proyecto")
+  @@index([id_tercero], map: "idx_trans_id_tercero")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model usuario_departamento_puesto {
+  id_asignacion        String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_usuario           String        @db.Uuid
+  id_departamento      String        @db.Uuid
+  id_puesto            String        @db.Uuid
+  fecha_inicio         DateTime?     @default(now()) @db.Timestamptz(6)
+  fecha_fin            DateTime?     @db.Timestamptz(6)
+  es_jefe_departamento Boolean       @default(false)
+  departamentos        departamentos @relation(fields: [id_departamento], references: [id_departamento], onDelete: Cascade, onUpdate: NoAction)
+  puestos              puestos       @relation(fields: [id_puesto], references: [id_puesto], onDelete: NoAction, onUpdate: NoAction)
+  usuarios             usuarios      @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([id_usuario, id_departamento], map: "uq_usuario_departamento")
+  @@index([id_departamento], map: "idx_udp_id_depto")
+  @@index([id_puesto], map: "idx_udp_id_puesto")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model usuario_roles {
+  id_usuario       String    @db.Uuid
+  id_rol           String    @db.Uuid
+  fecha_asignacion DateTime? @default(now()) @db.Timestamptz(6)
+  roles            roles     @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade, onUpdate: NoAction)
+  usuarios         usuarios  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_usuario, id_rol])
+  @@index([id_rol], map: "idx_usurol_id_rol")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model usuarios {
+  id_usuario                  String                        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre_completo             String                        @db.VarChar(255)
+  correo                      String                        @unique @db.VarChar(255)
+  cedula                      String                        @unique @db.VarChar(50)
+  contrasena_hash             String                        @db.VarChar(255)
+  estado                      String                        @default("Activo") @db.VarChar(50)
+  fecha_creacion              DateTime?                     @default(now()) @db.Timestamptz(6)
+  archivos                    archivos[]
+  auditoria_eventos           auditoria_eventos[]
+  beneficiarios               beneficiarios[]
+  campanas                    campanas[]
+  documento_firmas            documento_firmas[]
+  documento_versiones         documento_versiones[]
+  documentos                  documentos[]
+  notificaciones              notificaciones[]
+  proyecto_equipo             proyecto_equipo[]
+  proyectos                   proyectos[]
+  sesiones_usuario            sesiones_usuario[]
+  tarea_asignados             tarea_asignados[]
+  transacciones_financieras   transacciones_financieras[]
+  usuario_departamento_puesto usuario_departamento_puesto[]
+  usuario_roles               usuario_roles[]
+
+  @@index([correo], map: "idx_usuarios_correo")
+}
